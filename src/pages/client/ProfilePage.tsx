@@ -33,7 +33,7 @@ interface ProfilePageProps {
 }
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
-  const { userProfile, currentUser, updateUserProfileData, toggleDemoRole, logout, resetPassword, isAdmin } = useAuth();
+  const { userProfile, currentUser, updateUserProfileData, logout, resetPassword, isAdmin } = useAuth();
   const { orders } = useApp();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'account' | 'security' | 'notifications' | 'brand'>('profile');
@@ -247,21 +247,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                 </button>
               );
             })}
-
-            {/* Admin Switcher Preview for Testing */}
-            <div className="pt-3 mt-3 border-t border-white/[0.06] px-3 pb-2">
-              <span className="text-[10px] text-slate-500 uppercase font-mono block mb-1.5">
-                Account Switcher
-              </span>
-              <button
-                type="button"
-                onClick={toggleDemoRole}
-                className="w-full px-3 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-[11px] text-slate-300 flex items-center justify-between border border-white/5 cursor-pointer"
-              >
-                <span>Switch Role ({isAdmin ? 'Admin' : 'Client'})</span>
-                <RotateCcw className="w-3 h-3 text-cyan-400" />
-              </button>
-            </div>
           </div>
 
           {/* Right Main Settings Panel */}

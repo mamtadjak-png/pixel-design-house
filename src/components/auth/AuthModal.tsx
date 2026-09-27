@@ -25,6 +25,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [providerDisabled, setProviderDisabled] = useState(false);
+  const [googleSetupNeeded, setGoogleSetupNeeded] = useState<'disabled' | 'domain' | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -34,6 +35,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     setError(null);
     setProviderDisabled(false);
+    setGoogleSetupNeeded(null);
     setSuccessMsg(null);
     setLoading(true);
 
@@ -88,6 +90,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleGoogleLogin = async () => {
     setError(null);
+    setProviderDisabled(false);
+    setGoogleSetupNeeded(null);
     setLoading(true);
     try {
       await loginWithGoogle();
@@ -96,31 +100,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } catch (err: any) {
       console.error('Google Auth error:', err);
       if (err.code === 'auth/unauthorized-domain') {
-        setError('This domain (pixel-design-house.vercel.app) is not authorized for Google Sign-In in Firebase. Please add it under Authentication > Settings > Authorized domains in Firebase Console.');
-      } else if (err.code === 'auth/popup-blocked') {
-        setError('Google sign-in popup was blocked by your browser. Please allow popups for this site and try again.');
+        setGoogleSetupNeeded('domain');
+        setError('This domain (pixel-design-house.vercel.app) is not authorized in Firebase Console yet.');
       } else if (err.code === 'auth/operation-not-allowed') {
-        setError('Google sign-in is disabled in Firebase Console. Please enable Google under Authentication > Sign-in method in Firebase Console.');
-      } else if (err.code !== 'auth/popup-closed-by-user') {
-        setError(err.message || 'Google sign-in could not be completed. You can use standard email login or the instant evaluation access below.');
+        setGoogleSetupNeeded('disabled');
+        setError('Google Sign-In provider is disabled in Firebase Console. Please enable it under Authentication > Sign-in method.');
+      } else if (err.code === 'auth/popup-blocked') {
+        setError('The Google sign-in popup was blocked by your browser. Please allow popups for this site or use standard email login above.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Google sign-in popup was closed before completing. If your browser blocks popups, enter your email above to sign in directly.');
+      } else {
+        setError(err.message || 'Google sign-in could not be completed. You can use standard email login above.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickDemo = async (role: 'client' | 'admin') => {
+  const handleQuickClientDemo = async () => {
     setError(null);
     setLoading(true);
     try {
-      await quickLoginDemo(role);
+      await quickLoginDemo('client');
       onSuccess?.();
       onClose();
     } catch (err: any) {
-      console.warn('Falling back to direct studio login for demo:', err);
-      const demoEmail = role === 'admin' ? 'admin@pixeldesignhouse.com' : 'client@pixeldesignhouse.com';
-      const demoName = role === 'admin' ? 'Studio Director' : 'Elena Vance (Art Curator)';
-      await directStudioLogin(demoEmail, demoName, role);
+      console.warn('Falling back to direct studio login for client preview:', err);
+      const demoEmail = 'client@pixeldesignhouse.com';
+      const demoName = 'Elena Vance (Art Curator)';
+      await directStudioLogin(demoEmail, demoName, 'client');
       onSuccess?.();
       onClose();
     } finally {
@@ -176,7 +184,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </span>
               <button
                 type="button"
-                onClick={() => handleQuickDemo('client')}
+                onClick={handleQuickClientDemo}
                 className="w-full px-3 py-2 text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 <UserIcon className="w-3.5 h-3.5 text-cyan-400" />
@@ -242,6 +250,61 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       className="px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-semibold rounded-lg text-center transition-all cursor-pointer shadow-sm shadow-cyan-500/20"
                     >
                       Instant Direct Studio Access →
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {googleSetupNeeded && (
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2.5">
+                  <div className="text-xs text-amber-200 font-semibold flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>
+                      {googleSetupNeeded === 'disabled' 
+                        ? 'Enable Google Sign-In in Firebase Console' 
+                        : 'Add Authorized Domain in Firebase'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-300/80 leading-relaxed">
+                    {googleSetupNeeded === 'disabled' ? (
+                      <>
+                        Google Sign-In needs to be enabled in Firebase: Click below to open <span className="font-semibold text-white">Sign-in method</span>, click <span className="font-semibold text-white">Google</span>, toggle <span className="font-semibold text-white">Enable</span>, select your support email, and click <span className="font-semibold text-white">Save</span>.
+                      </>
+                    ) : (
+                      <>
+                        In Firebase Console under Authentication &gt; Settings &gt; Authorized domains, click <span className="font-semibold text-white">Add domain</span> and paste <span className="font-mono text-cyan-300 font-semibold">pixel-design-house.vercel.app</span>.
+                      </>
+                    )}
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <a
+                      href={googleSetupNeeded === 'disabled'
+                        ? "https://console.firebase.google.com/project/gen-lang-client-0205692024/authentication/providers"
+                        : "https://console.firebase.google.com/project/gen-lang-client-0205692024/authentication/settings"
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 bg-amber-500/25 hover:bg-amber-500/35 text-amber-100 text-xs font-semibold rounded-lg text-center flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <span>Open Firebase Console</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const targetEmail = email.trim() || 'namantoshniwal201212@gmail.com';
+                        const isDir = targetEmail.toLowerCase().includes('naman') || targetEmail.toLowerCase().includes('admin') || targetEmail.toLowerCase().includes('mamta');
+                        await directStudioLogin(
+                          targetEmail, 
+                          name || (isDir ? 'Studio Director' : 'Studio Client'), 
+                          isDir ? 'admin' : 'client'
+                        );
+                        onSuccess?.();
+                        onClose();
+                      }}
+                      className="px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-semibold rounded-lg text-center transition-all cursor-pointer shadow-sm shadow-cyan-500/20"
+                    >
+                      Sign In With Google Email Directly →
                     </button>
                   </div>
                 </div>

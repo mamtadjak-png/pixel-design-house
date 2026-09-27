@@ -37,7 +37,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuth,
   onOpenSearch 
 }) => {
-  const { currentUser, userProfile, isAdmin, logout, toggleDemoRole } = useAuth();
+  const { currentUser, userProfile, isAdmin, logout } = useAuth();
   const { notifications, conversations, savedWorkIds, markNotificationAsRead, markAllNotificationsRead } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -582,15 +582,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                     Admin Suite
                   </button>
                 )}
-                <button
-                  onClick={async () => {
-                    await toggleDemoRole();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="text-left text-xs font-semibold text-amber-300 py-1"
-                >
-                  Switch Role ({isAdmin ? 'to Client' : 'to Admin'})
-                </button>
               </>
             )}
           </div>

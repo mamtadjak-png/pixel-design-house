@@ -26,8 +26,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserProfileData: (data: Partial<UserProfile>) => Promise<void>;
-  toggleDemoRole: () => Promise<void>;
-  quickLoginDemo: (role: 'client' | 'admin') => Promise<void>;
+  quickLoginDemo: (role?: 'client') => Promise<void>;
   directStudioLogin: (email: string, name?: string, role?: UserRole) => Promise<void>;
 }
 
@@ -248,26 +247,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  // Only verified admins can toggle between admin view and client preview
-  const toggleDemoRole = async () => {
-    if (!currentUser || !userProfile) return;
-    const isMasterAdmin = currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase());
-    if (!isMasterAdmin) return;
-    const newRole: UserRole = userProfile.role === 'admin' ? 'client' : 'admin';
-    await updateUserProfileData({ role: newRole });
-  };
-
   // Direct access for studio operations without blocking on third-party auth outages
   const directStudioLogin = async (email: string, name?: string, role?: UserRole) => {
     setLoading(true);
     try {
       const cleanEmail = email.trim();
-      const isDefaultAdmin = ADMIN_EMAILS.includes(cleanEmail.toLowerCase()) || role === 'admin';
-      const userRole: UserRole = isDefaultAdmin ? 'admin' : (role || 'client');
-      const displayName = name || (isDefaultAdmin ? 'Studio Director' : cleanEmail.split('@')[0]);
+      const isMasterAdmin = ADMIN_EMAILS.includes(cleanEmail.toLowerCase());
+      const userRole: UserRole = isMasterAdmin ? 'admin' : 'client';
+      const displayName = name || (isMasterAdmin ? 'Studio Director' : cleanEmail.split('@')[0]);
 
       const mockUser: any = {
-        uid: isDefaultAdmin ? 'director-naman-master' : `client-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        uid: isMasterAdmin ? 'director-naman-master' : `client-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
         email: cleanEmail,
         displayName: displayName,
         emailVerified: true,
@@ -295,36 +285,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Instant one-click test account for testing client and admin workflows
-  const quickLoginDemo = async (role: 'client' | 'admin') => {
+  // Guest client preview for prospective clients exploring portal features
+  const quickLoginDemo = async (role?: 'client') => {
     setLoading(true);
     try {
-      const demoEmail = role === 'admin' ? 'admin@pixeldesignhouse.com' : 'client@pixeldesignhouse.com';
+      const demoEmail = 'client@pixeldesignhouse.com';
       const demoPass = 'PixelStudio2026!';
-      const demoName = role === 'admin' ? 'Studio Director' : 'Elena Vance (Art Curator)';
+      const demoName = 'Elena Vance (Art Curator)';
+      const clientRole: UserRole = 'client';
 
       let firebaseSucceeded = false;
       try {
         const res = await signInWithEmailAndPassword(auth, demoEmail, demoPass);
-        await syncOrCreateUserProfile(res.user, demoName, role);
+        await syncOrCreateUserProfile(res.user, demoName, clientRole);
         firebaseSucceeded = true;
       } catch (err: any) {
         if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
           try {
             const res = await createUserWithEmailAndPassword(auth, demoEmail, demoPass);
             await updateProfile(res.user, { displayName: demoName });
-            await syncOrCreateUserProfile(res.user, demoName, role);
+            await syncOrCreateUserProfile(res.user, demoName, clientRole);
             firebaseSucceeded = true;
           } catch (createErr) {
-            // If already exists or creation failed, fall through to direct studio session
+            // Fall through to direct studio session
           }
         }
       }
 
       // If Firebase Auth provider is not enabled in Firebase Console (PASSWORD_LOGIN_DISABLED),
-      // activate instant direct session so the user is NEVER locked out!
+      // activate instant direct session so the prospective client is not locked out!
       if (!firebaseSucceeded) {
-        await directStudioLogin(demoEmail, demoName, role);
+        await directStudioLogin(demoEmail, demoName, clientRole);
       }
     } finally {
       setLoading(false);
@@ -346,7 +337,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         resetPassword,
         updateUserProfileData,
-        toggleDemoRole,
         quickLoginDemo,
         directStudioLogin,
       }}

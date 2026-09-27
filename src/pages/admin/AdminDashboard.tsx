@@ -43,7 +43,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     deletePortfolioProject,
     updateServiceItem 
   } = useApp();
-  const { toggleDemoRole } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'orders' | 'projects' | 'clients' | 'portfolio' | 'services'>('orders');
 
@@ -201,12 +200,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
             >
               <MessageSquare className="w-3.5 h-3.5" />
               <span>Studio Support Inbox ({conversations.length})</span>
-            </button>
-            <button
-              onClick={toggleDemoRole}
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-xl text-xs font-semibold cursor-pointer"
-            >
-              Switch to Client View
             </button>
           </div>
         </div>
