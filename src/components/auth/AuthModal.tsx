@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { PixelLogo } from '../common/PixelLogo';
 import { Pixel3DScene } from '../3d/Pixel3DScene';
-import { X, Sparkles, Shield, User as UserIcon, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
+import { X, Sparkles, Shield, User as UserIcon, ArrowRight, Loader2, CheckCircle2, Lock, ArrowLeft, KeyRound } from 'lucide-react';
 
 const ADMIN_EMAILS = [
   'namantoshniwal201212@gmail.com',
   'mamtadjak@gmail.com',
   'admin@pixeldesignhouse.com',
 ];
+
+const STUDIO_DIRECTOR_PASSWORD = 'PixelDesignHouse@987654321';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -28,6 +30,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showAccountChooser, setShowAccountChooser] = useState(false);
   const [customGoogleEmail, setCustomGoogleEmail] = useState('');
   const [customName, setCustomName] = useState('');
+
+  // Admin password gate state
+  const [adminVerificationEmail, setAdminVerificationEmail] = useState<string | null>(null);
+  const [adminDisplayName, setAdminDisplayName] = useState<string>('');
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
 
   if (!isOpen) return null;
 
@@ -62,6 +69,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const handleInitiateAdminLogin = (email: string, displayName: string) => {
+    setError(null);
+    setAdminVerificationEmail(email);
+    setAdminDisplayName(displayName);
+    setAdminPasswordInput('');
+  };
+
+  const handleVerifyAdminPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!adminPasswordInput.trim()) {
+      setError('Please enter the Studio Director password.');
+      return;
+    }
+
+    if (adminPasswordInput !== STUDIO_DIRECTOR_PASSWORD) {
+      setError('Incorrect Studio Director password. Access denied.');
+      return;
+    }
+
+    if (adminVerificationEmail) {
+      await handleSelectAccount(adminVerificationEmail, adminDisplayName, 'admin');
+    }
+  };
+
   const handleCustomGoogleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customGoogleEmail.trim()) {
@@ -70,10 +102,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
     const cleanEmail = customGoogleEmail.trim().toLowerCase();
     const isAdmin = ADMIN_EMAILS.includes(cleanEmail);
+    if (isAdmin) {
+      handleInitiateAdminLogin(cleanEmail, customName.trim() || 'Studio Director');
+      return;
+    }
     await handleSelectAccount(
       cleanEmail,
       customName.trim() || cleanEmail.split('@')[0],
-      isAdmin ? 'admin' : 'client'
+      'client'
     );
   };
 
@@ -217,84 +253,150 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           ) : (
             /* Google Account Selection Screen */
             <div className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                <span className="text-xs font-semibold text-slate-300">
-                  Select your Google Account:
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowAccountChooser(false)}
-                  className="text-xs text-cyan-400 hover:text-cyan-300 cursor-pointer"
-                >
-                  ← Use Google Popup
-                </button>
-              </div>
-
-              {/* Quick Choice 1: Studio Director Account */}
-              <button
-                type="button"
-                onClick={() => handleSelectAccount('mamtadjak@gmail.com', 'Mamta (Studio Director)', 'admin')}
-                className="w-full p-3.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-amber-600/5 hover:from-amber-500/20 hover:to-amber-600/10 border border-amber-500/30 text-left transition-all flex items-center justify-between group cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 font-bold text-sm">
-                    M
+              {adminVerificationEmail ? (
+                /* Studio Director Password Gate */
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                    <span className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                      Studio Director Verification
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAdminVerificationEmail(null);
+                        setAdminPasswordInput('');
+                        setError(null);
+                      }}
+                      className="text-xs text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      Back to accounts
+                    </button>
                   </div>
-                  <div>
-                    <div className="text-xs font-semibold text-white flex items-center gap-2">
-                      <span>Studio Director</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium">Director Admin</span>
+
+                  <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs">
+                    <div className="text-[11px] text-amber-300 font-semibold mb-0.5">Authorizing Admin Session</div>
+                    <div className="font-mono text-white text-xs">{adminVerificationEmail}</div>
+                    <div className="text-[10px] text-slate-400 mt-1">Please enter your Studio Director security password to unlock the admin console.</div>
+                  </div>
+
+                  <form onSubmit={handleVerifyAdminPassword} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                        Studio Director Password:
+                      </label>
+                      <div className="relative">
+                        <KeyRound className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+                        <input
+                          type="password"
+                          autoFocus
+                          required
+                          value={adminPasswordInput}
+                          onChange={(e) => setAdminPasswordInput(e.target.value)}
+                          placeholder="Enter admin password"
+                          className="w-full bg-[#151824] border border-amber-500/30 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-colors"
+                        />
+                      </div>
                     </div>
-                    <div className="text-[11px] text-slate-400">mamtadjak@gmail.com</div>
-                  </div>
-                </div>
-                <ArrowRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
-              </button>
 
-              {/* Quick Choice 2: Studio Director Co-Founder Account */}
-              <button
-                type="button"
-                onClick={() => handleSelectAccount('namantoshniwal201212@gmail.com', 'Naman (Studio Director)', 'admin')}
-                className="w-full p-3.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-amber-600/5 hover:from-amber-500/20 hover:to-amber-600/10 border border-amber-500/30 text-left transition-all flex items-center justify-between group cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 font-bold text-sm">
-                    N
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-white flex items-center gap-2">
-                      <span>Studio Director</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium">Director Admin</span>
-                    </div>
-                    <div className="text-[11px] text-slate-400">namantoshniwal201212@gmail.com</div>
-                  </div>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      <Shield className="w-4 h-4" />
+                      <span>{loading ? 'Verifying...' : 'Verify & Enter Admin Portal →'}</span>
+                    </button>
+                  </form>
                 </div>
-                <ArrowRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
-              </button>
+              ) : (
+                /* Google Account Selection List */
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                    <span className="text-xs font-semibold text-slate-300">
+                      Select your Google Account:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAccountChooser(false)}
+                      className="text-xs text-cyan-400 hover:text-cyan-300 cursor-pointer"
+                    >
+                      ← Use Google Popup
+                    </button>
+                  </div>
 
-              {/* Custom Google Account Entry for Clients */}
-              <form onSubmit={handleCustomGoogleSubmit} className="pt-2 border-t border-white/10 space-y-2.5">
-                <label className="block text-xs font-medium text-slate-300">
-                  Or enter your Google Email (Client Portal):
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    required
-                    value={customGoogleEmail}
-                    onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                    placeholder="yourname@gmail.com"
-                    className="flex-1 bg-[#151824] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-                  />
+                  {/* Quick Choice 1: Studio Director Account */}
                   <button
-                    type="submit"
-                    disabled={loading}
-                    className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs rounded-xl transition-all cursor-pointer whitespace-nowrap"
+                    type="button"
+                    onClick={() => handleInitiateAdminLogin('mamtadjak@gmail.com', 'Mamta (Studio Director)')}
+                    className="w-full p-3.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-amber-600/5 hover:from-amber-500/20 hover:to-amber-600/10 border border-amber-500/30 text-left transition-all flex items-center justify-between group cursor-pointer"
                   >
-                    Continue →
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 font-bold text-sm">
+                        M
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-white flex items-center gap-2">
+                          <span>Studio Director</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5" /> Password Required
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-400">mamtadjak@gmail.com</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
                   </button>
+
+                  {/* Quick Choice 2: Studio Director Co-Founder Account */}
+                  <button
+                    type="button"
+                    onClick={() => handleInitiateAdminLogin('namantoshniwal201212@gmail.com', 'Naman (Studio Director)')}
+                    className="w-full p-3.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-amber-600/5 hover:from-amber-500/20 hover:to-amber-600/10 border border-amber-500/30 text-left transition-all flex items-center justify-between group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 font-bold text-sm">
+                        N
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-white flex items-center gap-2">
+                          <span>Studio Director</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5" /> Password Required
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-400">namantoshniwal201212@gmail.com</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
+                  </button>
+
+                  {/* Custom Google Account Entry for Clients */}
+                  <form onSubmit={handleCustomGoogleSubmit} className="pt-2 border-t border-white/10 space-y-2.5">
+                    <label className="block text-xs font-medium text-slate-300">
+                      Or enter your Google Email (Client Portal):
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        required
+                        value={customGoogleEmail}
+                        onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                        placeholder="yourname@gmail.com"
+                        className="flex-1 bg-[#151824] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                      />
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs rounded-xl transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        Continue →
+                      </button>
+                    </div>
+                  </form>
                 </div>
-              </form>
+              )}
             </div>
           )}
 
