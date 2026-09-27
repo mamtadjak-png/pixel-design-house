@@ -1,0 +1,6 @@
+{
+  "name": "Pixel Design House",
+  "description": "Pixels with Purpose — Premium creative digital studio, interactive client portal & project management platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
