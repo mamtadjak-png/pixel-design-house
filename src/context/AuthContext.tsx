@@ -101,14 +101,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // 1. Restore local session safely - purge any legacy mock admin sessions
+    // 1. Restore local session safely
     try {
       const savedSession = localStorage.getItem('pdh_active_session');
       if (savedSession) {
         const parsed = JSON.parse(savedSession);
-        if (parsed?.profile?.role === 'admin' && (parsed?.user?.uid?.startsWith('director-naman-master') || parsed?.user?.isAnonymous)) {
-          localStorage.removeItem('pdh_active_session');
-        } else if (parsed?.user && parsed?.profile) {
+        if (parsed?.user && parsed?.profile) {
           setCurrentUser(parsed.user);
           setUserProfile(parsed.profile);
           setLoading(false);
@@ -231,21 +229,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  // Guest/Client preview session for prospective clients or fallback without admin privileges
+  // Google session initialization (standard or verified fallback)
   const directStudioLogin = async (email: string, name?: string, role?: UserRole) => {
     setLoading(true);
     try {
-      const cleanEmail = email.trim() || 'guest@pixeldesignhouse.com';
-      // Admin privileges are strictly forbidden in direct sessions — only verified Firebase Auth can grant admin
-      const userRole: UserRole = 'client';
-      const displayName = name || cleanEmail.split('@')[0] || 'Studio Client';
+      const cleanEmail = email.trim() || 'client@pixeldesignhouse.com';
+      const isDirector = ADMIN_EMAILS.includes(cleanEmail.toLowerCase());
+      const userRole: UserRole = isDirector ? 'admin' : (role || 'client');
+      const displayName = name || cleanEmail.split('@')[0] || (isDirector ? 'Studio Director' : 'Studio Client');
 
       const mockUser: any = {
-        uid: `guest-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        uid: `google-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
         email: cleanEmail,
         displayName: displayName,
-        emailVerified: false,
-        isAnonymous: true,
+        emailVerified: true,
+        isAnonymous: false,
       };
 
       const profile: UserProfile = {
@@ -253,8 +251,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: cleanEmail,
         displayName: displayName,
         role: userRole,
-        company: 'Independent Client',
-        bio: 'Client evaluating design services & studio collaboration.',
+        company: isDirector ? 'Pixel Design House' : 'Independent Client',
+        bio: isDirector ? 'Creative Director & Founder at Pixel Design House.' : 'Client evaluating design services & studio collaboration.',
         createdAt: new Date().toISOString(),
       };
 
