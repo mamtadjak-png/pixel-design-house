@@ -438,32 +438,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                     )}
                   </div>
 
-                  {/* Switch Demo Role Quick Test */}
                   <div className="pt-1 border-t border-white/5">
-                    <button
-                      onClick={async () => {
-                        await toggleDemoRole();
-                        setProfileDropdownOpen(false);
-                      }}
-                      className="w-full px-3 py-2 text-left text-xs font-medium text-amber-300 hover:bg-amber-500/10 rounded-xl flex items-center justify-between cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Switch to {isAdmin ? 'Client View' : 'Admin View'}</span>
-                      </div>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">
-                        Test Mode
-                      </span>
-                    </button>
-
                     <button
                       onClick={() => {
                         logout();
                         setProfileDropdownOpen(false);
                       }}
-                      className="w-full px-3 py-2 text-left text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl flex items-center gap-2 cursor-pointer mt-1"
+                      className="w-full px-3 py-2 text-left text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl flex items-center gap-2 cursor-pointer"
                     >
-                      <LogOut className="w-3.5 h-3.5" />
+                      <LogOut className="w-4 h-4 text-rose-400" />
                       <span>Sign Out</span>
                     </button>
                   </div>

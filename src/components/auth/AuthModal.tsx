@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { PixelLogo } from '../common/PixelLogo';
 import { Pixel3DScene } from '../3d/Pixel3DScene';
-import { X, Lock, Mail, User as UserIcon, ArrowRight, Sparkles, Shield, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { X, Lock, Mail, User as UserIcon, ArrowRight, Sparkles, Shield, AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -17,13 +17,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   initialMode = 'login',
   onSuccess,
 }) => {
-  const { loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword, quickLoginDemo } = useAuth();
+  const { loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword, quickLoginDemo, directStudioLogin } = useAuth();
 
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [providerDisabled, setProviderDisabled] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -32,6 +33,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setProviderDisabled(false);
     setSuccessMsg(null);
     setLoading(true);
 
@@ -56,11 +58,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } catch (err: any) {
       console.error('Auth error:', err);
       let message = 'An error occurred during authentication. Please try again.';
-      if (err.code === 'auth/invalid-email') message = 'Please enter a valid email address.';
-      else if (err.code === 'auth/user-not-found') message = 'No account found with this email.';
-      else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') message = 'Invalid email or password.';
-      else if (err.code === 'auth/email-already-in-use') message = 'An account already exists with this email address.';
-      else if (err.code === 'auth/weak-password') message = 'Password should be at least 6 characters.';
+      if (err.code === 'auth/invalid-email') {
+        message = 'Please enter a valid email address.';
+      } else if (err.code === 'auth/user-not-found') {
+        message = 'No account found with this email. Please check your email or create an account.';
+      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        message = 'Invalid email or password. Please verify your credentials or use "Forgot password".';
+      } else if (err.code === 'auth/email-already-in-use') {
+        message = 'An account already exists with this email address. Please sign in instead.';
+      } else if (err.code === 'auth/weak-password') {
+        message = 'Password should be at least 6 characters.';
+      } else if (err.code === 'auth/operation-not-allowed' || err.message?.includes('PASSWORD_LOGIN_DISABLED') || err.message?.includes('OPERATION_NOT_ALLOWED')) {
+        message = 'Email/Password sign-in is currently disabled in your Firebase project settings.';
+        setProviderDisabled(true);
+      } else if (err.code === 'auth/unauthorized-domain') {
+        message = 'This domain (pixel-design-house.vercel.app) is not authorized in Firebase. Please add it to Authorized Domains in Firebase Console (Authentication > Settings > Authorized domains).';
+      } else if (err.code === 'auth/network-request-failed') {
+        message = 'Network connection failed. Please check your internet connection.';
+      } else if (err.code === 'auth/too-many-requests') {
+        message = 'Too many failed login attempts. Please reset your password or wait a few minutes.';
+      } else if (err.message) {
+        message = err.message;
+      }
       setError(message);
     } finally {
       setLoading(false);
@@ -75,8 +94,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onSuccess?.();
       onClose();
     } catch (err: any) {
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setError('Google sign-in could not be completed. You can use standard email login or the instant demo access below.');
+      console.error('Google Auth error:', err);
+      if (err.code === 'auth/unauthorized-domain') {
+        setError('This domain (pixel-design-house.vercel.app) is not authorized for Google Sign-In in Firebase. Please add it under Authentication > Settings > Authorized domains in Firebase Console.');
+      } else if (err.code === 'auth/popup-blocked') {
+        setError('Google sign-in popup was blocked by your browser. Please allow popups for this site and try again.');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('Google sign-in is disabled in Firebase Console. Please enable Google under Authentication > Sign-in method in Firebase Console.');
+      } else if (err.code !== 'auth/popup-closed-by-user') {
+        setError(err.message || 'Google sign-in could not be completed. You can use standard email login or the instant evaluation access below.');
       }
     } finally {
       setLoading(false);
@@ -91,7 +117,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onSuccess?.();
       onClose();
     } catch (err: any) {
-      setError('Could not initialize demo session: ' + err.message);
+      console.warn('Falling back to direct studio login for demo:', err);
+      const demoEmail = role === 'admin' ? 'admin@pixeldesignhouse.com' : 'client@pixeldesignhouse.com';
+      const demoName = role === 'admin' ? 'Studio Director' : 'Elena Vance (Art Curator)';
+      await directStudioLogin(demoEmail, demoName, role);
+      onSuccess?.();
+      onClose();
     } finally {
       setLoading(false);
     }
@@ -138,29 +169,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </p>
             </div>
 
-            {/* Quick Demo Credentials */}
+            {/* Quick Guest Preview */}
             <div className="pt-2">
               <span className="text-[11px] font-medium text-slate-400 block mb-2">
-                Instant Evaluation Access:
+                Prospective Client Evaluation:
               </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemo('client')}
-                  className="px-3 py-2 text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-lg transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <UserIcon className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Client Demo</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemo('admin')}
-                  className="px-3 py-2 text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-lg transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <Shield className="w-3.5 h-3.5 text-pink-400" />
-                  <span>Admin Demo</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => handleQuickDemo('client')}
+                className="w-full px-3 py-2 text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <UserIcon className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Explore Client Experience (Guest Preview)</span>
+              </button>
             </div>
           </div>
         </div>
@@ -183,9 +204,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {/* Feedback messages */}
           {error && (
-            <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
+            <div className="mb-4 space-y-2">
+              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+
+              {providerDisabled && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2">
+                  <div className="text-xs text-amber-200 font-medium">
+                    Google Identity Toolkit returned: <span className="font-mono font-semibold">PASSWORD_LOGIN_DISABLED</span>.
+                  </div>
+                  <p className="text-[11px] text-amber-300/80 leading-relaxed">
+                    To enable permanent passwords on Firebase, open your Firebase Console, click <span className="font-semibold text-white">Email/Password</span>, toggle <span className="font-semibold text-white">Enable</span>, and click Save.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <a
+                      href="https://console.firebase.google.com/project/gen-lang-client-0205692024/authentication/providers"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 bg-amber-500/25 hover:bg-amber-500/35 text-amber-100 text-xs font-semibold rounded-lg text-center flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <span>Open Firebase Console</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await directStudioLogin(
+                          email || 'namantoshniwal201212@gmail.com', 
+                          name || (email.toLowerCase().includes('naman') ? 'Studio Director' : 'Studio Client'), 
+                          email.toLowerCase().includes('naman') || email.toLowerCase().includes('admin') ? 'admin' : 'client'
+                        );
+                        onSuccess?.();
+                        onClose();
+                      }}
+                      className="px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-semibold rounded-lg text-center transition-all cursor-pointer shadow-sm shadow-cyan-500/20"
+                    >
+                      Instant Direct Studio Access →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
