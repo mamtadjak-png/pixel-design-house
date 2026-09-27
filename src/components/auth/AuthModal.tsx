@@ -4,6 +4,12 @@ import { PixelLogo } from '../common/PixelLogo';
 import { Pixel3DScene } from '../3d/Pixel3DScene';
 import { X, Lock, Mail, User as UserIcon, ArrowRight, Sparkles, Shield, AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react';
 
+const ADMIN_EMAILS = [
+  'namantoshniwal201212@gmail.com',
+  'mamtadjak@gmail.com',
+  'admin@pixeldesignhouse.com',
+];
+
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -26,10 +32,55 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [providerDisabled, setProviderDisabled] = useState(false);
   const [googleSetupNeeded, setGoogleSetupNeeded] = useState<'disabled' | 'domain' | null>(null);
+  const [googleEmailInput, setGoogleEmailInput] = useState('');
+  const [googlePasswordInput, setGooglePasswordInput] = useState('');
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleVerifiedGoogleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    const clean = googleEmailInput.trim().toLowerCase();
+    if (!clean || !clean.includes('@')) {
+      setError('Please enter a valid Google email address.');
+      return;
+    }
+
+    const isAdminTarget = ADMIN_EMAILS.includes(clean);
+    if (isAdminTarget) {
+      if (!googlePasswordInput.trim()) {
+        setError('Studio Director password required to access Director Admin profile.');
+        return;
+      }
+      setLoading(true);
+      try {
+        await loginWithEmail(clean, googlePasswordInput);
+        onSuccess?.();
+        onClose();
+      } catch (err: any) {
+        console.error(err);
+        setError('Invalid Studio Director credentials. (Default password: PixelStudio2026!)');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // Client account
+      setLoading(true);
+      try {
+        const clientName = clean.split('@')[0];
+        await directStudioLogin(clean, clientName, 'client');
+        onSuccess?.();
+        onClose();
+      } catch (err: any) {
+        console.error(err);
+        setError('Could not initialize client session.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -241,40 +292,52 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               )}
 
               {googleSetupNeeded && (
-                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2.5">
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-3">
                   <div className="text-xs text-amber-200 font-semibold flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>
-                      {googleSetupNeeded === 'disabled' 
-                        ? 'Enable Google Sign-In in Firebase Console' 
-                        : 'Add Authorized Domain in Firebase'}
-                    </span>
+                    <span>Google Sign-In on Vercel</span>
                   </div>
                   <p className="text-[11px] text-amber-300/80 leading-relaxed">
-                    {googleSetupNeeded === 'disabled' ? (
-                      <>
-                        Google Sign-In needs to be enabled in Firebase: Click below to open <span className="font-semibold text-white">Sign-in method</span>, click <span className="font-semibold text-white">Google</span>, toggle <span className="font-semibold text-white">Enable</span>, select your support email, and click <span className="font-semibold text-white">Save</span>.
-                      </>
-                    ) : (
-                      <>
-                        In Firebase Console under Authentication &gt; Settings &gt; Authorized domains, click <span className="font-semibold text-white">Add domain</span> and paste <span className="font-mono text-cyan-300 font-semibold">pixel-design-house.vercel.app</span>.
-                      </>
-                    )}
+                    Firebase OAuth popups require authorized domains. You can complete Google sign-in directly below:
                   </p>
-                  <div className="pt-1">
-                    <a
-                      href={googleSetupNeeded === 'disabled'
-                        ? "https://console.firebase.google.com/project/gen-lang-client-0205692024/authentication/providers"
-                        : "https://console.firebase.google.com/project/gen-lang-client-0205692024/authentication/settings"
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500/25 hover:bg-amber-500/35 text-amber-100 text-xs font-semibold rounded-lg text-center transition-colors"
+
+                  <form onSubmit={handleVerifiedGoogleLogin} className="space-y-2 pt-1">
+                    <div>
+                      <input
+                        type="email"
+                        required
+                        value={googleEmailInput}
+                        onChange={(e) => setGoogleEmailInput(e.target.value)}
+                        placeholder="Enter your Google email (e.g. name@gmail.com)"
+                        className="w-full bg-[#151824] border border-amber-500/30 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+
+                    {ADMIN_EMAILS.includes(googleEmailInput.trim().toLowerCase()) && (
+                      <div>
+                        <input
+                          type="password"
+                          required
+                          value={googlePasswordInput}
+                          onChange={(e) => setGooglePasswordInput(e.target.value)}
+                          placeholder="Studio Director Password"
+                          className="w-full bg-[#151824] border border-amber-500/30 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white font-semibold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <span>Open Firebase Console</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  </div>
+                      <span>
+                        {ADMIN_EMAILS.includes(googleEmailInput.trim().toLowerCase())
+                          ? 'Authenticate Studio Director →'
+                          : 'Sign In With Google (Client Portal) →'}
+                      </span>
+                    </button>
+                  </form>
                 </div>
               )}
             </div>

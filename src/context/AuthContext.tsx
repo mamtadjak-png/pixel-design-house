@@ -43,54 +43,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Sync user profile document in Firestore
+  // Sync user profile document in Firestore with offline resilience
   const syncOrCreateUserProfile = async (user: User, fallbackName?: string, forceRole?: UserRole) => {
+    const isDefaultAdmin = (user.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) || forceRole === 'admin';
+    const fallbackProfile: UserProfile = {
+      uid: user.uid,
+      email: user.email || '',
+      displayName: fallbackName || user.displayName || user.email?.split('@')[0] || (isDefaultAdmin ? 'Studio Director' : 'Studio Client'),
+      photoURL: user.photoURL || undefined,
+      role: isDefaultAdmin ? 'admin' : (forceRole || 'client'),
+      company: isDefaultAdmin ? 'Pixel Design House' : 'Independent Venture',
+      bio: isDefaultAdmin ? 'Creative Director & Founder at Pixel Design House.' : 'Client partner collaborating on brand & digital design.',
+      projectPreferences: ['Posters', 'Brand Identity', 'Motion Video'],
+      notificationSettings: {
+        emailUpdates: true,
+        orderProgress: true,
+        chatPings: true,
+        studioNews: false,
+      },
+      createdAt: new Date().toISOString(),
+    };
+
     try {
       const userDocRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userDocRef);
-
-      const isDefaultAdmin = (user.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) || forceRole === 'admin';
+      let userSnap;
+      try {
+        userSnap = await getDoc(userDocRef);
+      } catch (getErr: any) {
+        // If client is currently offline or connecting, adopt fallback profile safely
+        console.warn('Firestore client offline or connecting, using cached session:', getErr?.message || getErr);
+        setUserProfile(fallbackProfile);
+        return;
+      }
 
       if (!userSnap.exists()) {
-        const newProfile: UserProfile = {
-          uid: user.uid,
-          email: user.email || '',
-          displayName: fallbackName || user.displayName || user.email?.split('@')[0] || 'Studio Client',
-          photoURL: user.photoURL || undefined,
-          role: isDefaultAdmin ? 'admin' : (forceRole || 'client'),
-          company: isDefaultAdmin ? 'Pixel Design House' : 'Independent Venture',
-          bio: isDefaultAdmin ? 'Creative Director & Founder at Pixel Design House.' : 'Client partner collaborating on brand & digital design.',
-          projectPreferences: ['Posters', 'Brand Identity', 'Motion Video'],
-          notificationSettings: {
-            emailUpdates: true,
-            orderProgress: true,
-            chatPings: true,
-            studioNews: false,
-          },
-          createdAt: new Date().toISOString(),
-        };
-
-        await setDoc(userDocRef, newProfile);
-        setUserProfile(newProfile);
+        try {
+          await setDoc(userDocRef, fallbackProfile);
+        } catch (setErr) {
+          console.warn('Deferred profile write until online:', setErr);
+        }
+        setUserProfile(fallbackProfile);
       } else {
         const data = userSnap.data() as UserProfile;
         // Keep role sync if designated admin
         if (isDefaultAdmin && data.role !== 'admin') {
-          await setDoc(userDocRef, { ...data, role: 'admin' }, { merge: true });
+          try {
+            await setDoc(userDocRef, { ...data, role: 'admin' }, { merge: true });
+          } catch {}
           data.role = 'admin';
         }
         setUserProfile(data);
       }
-    } catch (err) {
-      console.error('Error syncing user profile:', err);
-      // Fallback local memory profile so app remains accessible
-      setUserProfile({
-        uid: user.uid,
-        email: user.email || '',
-        displayName: fallbackName || user.displayName || user.email?.split('@')[0] || 'Client User',
-        role: (user.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) ? 'admin' : 'client',
-        createdAt: new Date().toISOString(),
-      });
+    } catch (err: any) {
+      console.warn('Notice syncing user profile (offline fallback active):', err?.message || err);
+      setUserProfile(fallbackProfile);
     }
   };
 
