@@ -95,12 +95,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // 1. Restore local session immediately if present so app remains responsive
+    // 1. Restore local session safely - purge any legacy mock admin sessions
     try {
       const savedSession = localStorage.getItem('pdh_active_session');
       if (savedSession) {
         const parsed = JSON.parse(savedSession);
-        if (parsed?.user && parsed?.profile) {
+        if (parsed?.profile?.role === 'admin' && (parsed?.user?.uid?.startsWith('director-naman-master') || parsed?.user?.isAnonymous)) {
+          localStorage.removeItem('pdh_active_session');
+        } else if (parsed?.user && parsed?.profile) {
           setCurrentUser(parsed.user);
           setUserProfile(parsed.profile);
           setLoading(false);
@@ -152,20 +154,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       const cleanEmail = email.trim();
-      try {
-        const res = await signInWithEmailAndPassword(auth, cleanEmail, pass);
-        await syncOrCreateUserProfile(res.user);
-      } catch (err: any) {
-        // If Firebase project has Email/Password disabled (auth/operation-not-allowed),
-        // or during configuration transition, seamlessly log them in via direct studio session!
-        if (err.code === 'auth/operation-not-allowed' || err.message?.includes('PASSWORD_LOGIN_DISABLED') || err.message?.includes('OPERATION_NOT_ALLOWED')) {
-          console.warn('Firebase Email/Password is disabled in project; activating direct studio session.');
-          const isDirector = ADMIN_EMAILS.includes(cleanEmail.toLowerCase());
-          await directStudioLogin(cleanEmail, isDirector ? 'Studio Director' : undefined, isDirector ? 'admin' : 'client');
-          return;
-        }
-        throw err;
-      }
+      const res = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+      await syncOrCreateUserProfile(res.user);
     } finally {
       setLoading(false);
     }
@@ -176,25 +166,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cleanEmail = email.trim();
       const cleanName = name.trim();
+      const res = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
       try {
-        const res = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
-        try {
-          await updateProfile(res.user, { displayName: cleanName });
-        } catch (profileErr) {
-          console.warn('Could not update Firebase Auth profile display name:', profileErr);
-        }
-        await syncOrCreateUserProfile(res.user, cleanName);
-      } catch (err: any) {
-        // If Firebase project has Email/Password disabled (auth/operation-not-allowed),
-        // seamlessly establish studio account so user is not blocked!
-        if (err.code === 'auth/operation-not-allowed' || err.message?.includes('PASSWORD_LOGIN_DISABLED') || err.message?.includes('OPERATION_NOT_ALLOWED')) {
-          console.warn('Firebase Email/Password is disabled in project; activating direct studio session.');
-          const isDirector = ADMIN_EMAILS.includes(cleanEmail.toLowerCase());
-          await directStudioLogin(cleanEmail, cleanName, isDirector ? 'admin' : 'client');
-          return;
-        }
-        throw err;
+        await updateProfile(res.user, { displayName: cleanName });
+      } catch (profileErr) {
+        console.warn('Could not update Firebase Auth profile display name:', profileErr);
       }
+      await syncOrCreateUserProfile(res.user, cleanName);
     } finally {
       setLoading(false);
     }
@@ -247,21 +225,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  // Direct access for studio operations without blocking on third-party auth outages
+  // Guest/Client preview session for prospective clients or fallback without admin privileges
   const directStudioLogin = async (email: string, name?: string, role?: UserRole) => {
     setLoading(true);
     try {
-      const cleanEmail = email.trim();
-      const isMasterAdmin = ADMIN_EMAILS.includes(cleanEmail.toLowerCase());
-      const userRole: UserRole = isMasterAdmin ? 'admin' : 'client';
-      const displayName = name || (isMasterAdmin ? 'Studio Director' : cleanEmail.split('@')[0]);
+      const cleanEmail = email.trim() || 'guest@pixeldesignhouse.com';
+      // Admin privileges are strictly forbidden in direct sessions — only verified Firebase Auth can grant admin
+      const userRole: UserRole = 'client';
+      const displayName = name || cleanEmail.split('@')[0] || 'Studio Client';
 
       const mockUser: any = {
-        uid: isMasterAdmin ? 'director-naman-master' : `client-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        uid: `guest-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
         email: cleanEmail,
         displayName: displayName,
-        emailVerified: true,
-        isAnonymous: false,
+        emailVerified: false,
+        isAnonymous: true,
       };
 
       const profile: UserProfile = {
@@ -269,8 +247,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: cleanEmail,
         displayName: displayName,
         role: userRole,
-        company: userRole === 'admin' ? 'Pixel Design House' : 'Independent Venture',
-        bio: userRole === 'admin' ? 'Creative Director & Founder at Pixel Design House.' : 'Client partner collaborating on brand & digital design.',
+        company: 'Independent Client',
+        bio: 'Client evaluating design services & studio collaboration.',
         createdAt: new Date().toISOString(),
       };
 

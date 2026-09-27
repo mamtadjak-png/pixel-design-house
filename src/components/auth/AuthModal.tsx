@@ -226,31 +226,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <p className="text-[11px] text-amber-300/80 leading-relaxed">
                     To enable permanent passwords on Firebase, open your Firebase Console, click <span className="font-semibold text-white">Email/Password</span>, toggle <span className="font-semibold text-white">Enable</span>, and click Save.
                   </p>
-                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <div className="pt-1">
                     <a
                       href="https://console.firebase.google.com/project/gen-lang-client-0205692024/authentication/providers"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3 py-2 bg-amber-500/25 hover:bg-amber-500/35 text-amber-100 text-xs font-semibold rounded-lg text-center flex items-center justify-center gap-1.5 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500/25 hover:bg-amber-500/35 text-amber-100 text-xs font-semibold rounded-lg text-center transition-colors"
                     >
                       <span>Open Firebase Console</span>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await directStudioLogin(
-                          email || 'namantoshniwal201212@gmail.com', 
-                          name || (email.toLowerCase().includes('naman') ? 'Studio Director' : 'Studio Client'), 
-                          email.toLowerCase().includes('naman') || email.toLowerCase().includes('admin') ? 'admin' : 'client'
-                        );
-                        onSuccess?.();
-                        onClose();
-                      }}
-                      className="px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-semibold rounded-lg text-center transition-all cursor-pointer shadow-sm shadow-cyan-500/20"
-                    >
-                      Instant Direct Studio Access →
-                    </button>
                   </div>
                 </div>
               )}
@@ -276,7 +261,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       </>
                     )}
                   </p>
-                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <div className="pt-1">
                     <a
                       href={googleSetupNeeded === 'disabled'
                         ? "https://console.firebase.google.com/project/gen-lang-client-0205692024/authentication/providers"
@@ -284,28 +269,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       }
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3 py-2 bg-amber-500/25 hover:bg-amber-500/35 text-amber-100 text-xs font-semibold rounded-lg text-center flex items-center justify-center gap-1.5 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500/25 hover:bg-amber-500/35 text-amber-100 text-xs font-semibold rounded-lg text-center transition-colors"
                     >
                       <span>Open Firebase Console</span>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const targetEmail = email.trim() || 'namantoshniwal201212@gmail.com';
-                        const isDir = targetEmail.toLowerCase().includes('naman') || targetEmail.toLowerCase().includes('admin') || targetEmail.toLowerCase().includes('mamta');
-                        await directStudioLogin(
-                          targetEmail, 
-                          name || (isDir ? 'Studio Director' : 'Studio Client'), 
-                          isDir ? 'admin' : 'client'
-                        );
-                        onSuccess?.();
-                        onClose();
-                      }}
-                      className="px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-semibold rounded-lg text-center transition-all cursor-pointer shadow-sm shadow-cyan-500/20"
-                    >
-                      Sign In With Google Email Directly →
-                    </button>
                   </div>
                 </div>
               )}
